@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, UserPlus, Briefcase, CheckCircle, Clock, FileText, ArrowRight, Plane, MessageSquare, LogIn, LogOut, Lock, Mail, DollarSign, Percent, Key, User as UserIcon, Search, Calendar, Plus, Trash2, PieChart } from 'lucide-react';
+import { Users, UserPlus, Briefcase, CheckCircle, Clock, FileText, ArrowRight, Plane, MessageSquare, LogIn, LogOut, Lock, Mail, DollarSign, Percent, Key, User as UserIcon, Search, Calendar, Plus, Trash2, PieChart, Edit2, Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
@@ -14,7 +14,7 @@ interface Cliente {
   andamento: string;
   obs: string;
   valor: number;
-  servico: string; // Novo campo integrado
+  servico: string;
 }
 
 interface Compromisso {
@@ -62,6 +62,10 @@ export default function Home() {
   const [novoValor, setNovoValor] = useState('');
   const [servicoSelecionado, setServicoSelecionado] = useState('Consultoria');
   const [novaObs, setNovaObs] = useState('');
+
+  // Estados para controle de edição de observação na tabela
+  const [clienteEditandoObs, setClienteEditandoObs] = useState<number | null>(null);
+  const [textoObsEditando, setTextoObsEditando] = useState('');
 
   // Estados da Agenda
   const [agenda, setAgenda] = useState<Compromisso[]>([]);
@@ -185,7 +189,6 @@ export default function Home() {
     e.preventDefault();
     if (!novoNome || !novoNumero || !novaData) return alert('Preencha Nome, Data e Número!');
 
-    // Validação básica para garantir que não colocaram texto no lugar da data
     if (!novaData.includes('/') && novaData.length > 4 && isNaN(Number(novaData))) {
       return alert('Atenção: Insira uma data válida no campo "DATA DO CONTATO" (Ex: 26/06/2026)!');
     }
@@ -272,24 +275,21 @@ export default function Home() {
     }
   };
 
-  const obterProximaEtapa = (statusAtual: string) => {
-    const index = ETAPAS_FUNIL.indexOf(statusAtual);
-    if (index !== -1 && index < ETAPAS_FUNIL.length - 1) {
-      return ETAPAS_FUNIL[index + 1];
+  const salvarEdicaoObs = async (id: number) => {
+    const { error } = await supabase
+      .from('clientes')
+      .update({ obs: textoObsEditando })
+      .eq('id', id);
+
+    if (error) {
+      alert('Erro ao atualizar observação: ' + error.message);
+    } else {
+      setClientes(clientes.map(c => c.id === id ? { ...c, obs: textoObsEditando } : c));
+      setClienteEditandoObs(null);
     }
-    return null;
   };
 
-  const obterEstiloStatus = (status: string) => {
-    switch (status) {
-      case 'Primeiro Contato': return 'bg-slate-800 text-slate-300 border border-slate-700';
-      case 'Negociação': return 'bg-amber-500/10 text-amber-500 border border-amber-500/20';
-      case 'Conversa com Matheus': return 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
-      case 'Chegada na Espanha': return 'bg-red-500/10 text-red-400 border border-red-500/20';
-      case 'Migração Completa': return 'bg-red-500/20 text-red-500 border border-red-500/30 font-bold';
-      default: return 'bg-slate-800 text-slate-400';
-    }
-  };
+ 
 
   const clientesDaSessao = usuarioAtual === 'vendedora' 
     ? clientes.filter(c => c.vendedora.toLowerCase() === nomeVendedoraLogada.toLowerCase())
@@ -316,7 +316,6 @@ export default function Home() {
   const totalComissaoDevida = clientes.filter(c => c.andamento === 'Migração Completa').length * 300;
   const seuLucroLiquidoGeral = faturamentoFechado - totalComissaoDevida;
 
-  // Lógica de cálculo segmentada por tipo de serviço para o Admin
   const totalConsultoria = clientes.filter(c => c.andamento === 'Migração Completa' && (c.servico === 'Consultoria' || !c.servico)).reduce((acc, c) => acc + (c.valor || 0), 0);
   const totalRelocation = clientes.filter(c => c.andamento === 'Migração Completa' && c.servico === 'Relocation').reduce((acc, c) => acc + (c.valor || 0), 0);
   const totalAmbos = clientes.filter(c => c.andamento === 'Migração Completa' && c.servico === 'Ambos').reduce((acc, c) => acc + (c.valor || 0), 0);
@@ -534,7 +533,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* SEÇÃO NOVA: VISUALIZAÇÃO POR TIPOS DE RECEITA */}
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3">
               <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-900 pb-2">
                 <PieChart className="h-4 w-4 text-red-500" />
@@ -673,7 +671,6 @@ export default function Home() {
                   <label className="block text-xs font-medium text-slate-400 mb-1">NÚMERO</label>
                   <input type="text" value={novoNumero} onChange={e => setNovoNumero(e.target.value)} placeholder="Ex: (11) 99999-9999" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
                 </div>
-                {/* NOVO CAMPO: SELETOR DE MODALIDADE */}
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">TIPO DE SERVIÇO</label>
                   <select value={servicoSelecionado} onChange={e => setServicoSelecionado(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
@@ -752,8 +749,6 @@ export default function Home() {
                     </tr>
                   ) : (
                     clientesFiltrados.map((cliente) => {
-                      const proximaEtapa = obterProximaEtapa(cliente.andamento);
-
                       return (
                         <tr key={cliente.id} className="hover:bg-slate-900/30 transition">
                           <td className="p-4 font-medium text-white">{cliente.nome}</td>
@@ -772,29 +767,70 @@ export default function Home() {
                               {cliente.vendedora}
                             </span>
                           </td>
-                          <td className="p-4 text-slate-400 max-w-xs truncate" title={cliente.obs}>
-                            <div className="flex items-center gap-1">
-                              <FileText className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                              <span>{cliente.obs || 'Nenhuma nota'}</span>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${obterEstiloStatus(cliente.andamento)}`}>
-                              {cliente.andamento}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right">
-                            {proximaEtapa ? (
-                              <button 
-                                onClick={() => mudarAndamento(cliente.id, proximaEtapa)}
-                                className="text-xs bg-slate-800 text-amber-500 hover:bg-red-600/10 hover:text-red-400 px-3 py-1.5 rounded border border-slate-700 hover:border-red-500/30 transition font-medium flex items-center gap-1 ml-auto"
-                              >
-                                Avançar para: {proximaEtapa} <ArrowRight className="h-3 w-3" />
-                              </button>
+                          
+                          {/* Coluna de OBS interativa e editável diretamente inline */}
+                          <td className="p-4 text-slate-400 max-w-xs">
+                            {clienteEditandoObs === cliente.id ? (
+                              <div className="flex items-center gap-1.5">
+                                <input 
+                                  type="text" 
+                                  value={textoObsEditando} 
+                                  onChange={e => setTextoObsEditando(e.target.value)}
+                                  className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none w-full"
+                                />
+                                <button onClick={() => salvarEdicaoObs(cliente.id)} className="text-emerald-500 hover:bg-emerald-500/10 p-1 rounded transition"><Check className="h-3.5 w-3.5" /></button>
+                                <button onClick={() => setClienteEditandoObs(null)} className="text-rose-500 hover:bg-rose-500/10 p-1 rounded transition"><X className="h-3.5 w-3.5" /></button>
+                              </div>
                             ) : (
+                              <div className="flex items-center justify-between gap-1 group">
+                                <div className="flex items-center gap-1 truncate" title={cliente.obs}>
+                                  <FileText className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                                  <span>{cliente.obs || 'Nenhuma nota'}</span>
+                                </div>
+                                <button 
+                                  onClick={() => {
+                                    setClienteEditandoObs(cliente.id);
+                                    setTextoObsEditando(cliente.obs || '');
+                                  }} 
+                                  className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-amber-500 p-1 transition shrink-0"
+                                  title="Editar Observação"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Dropdown interno que permite avançar ou voltar qualquer etapa de forma livre */}
+                          <td className="p-4">
+                            <select
+                              value={cliente.andamento}
+                              onChange={(e) => mudarAndamento(cliente.id, e.target.value)}
+                              className="text-xs font-semibold px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white focus:outline-none cursor-pointer"
+                            >
+                              {ETAPAS_FUNIL.map((etapa) => (
+                                <option key={etapa} value={etapa}>{etapa}</option>
+                              ))}
+                            </select>
+                          </td>
+
+                          <td className="p-4 text-right">
+                            {cliente.andamento === 'Migração Completa' ? (
                               <span className="text-xs text-red-500 font-semibold bg-red-500/10 border border-red-500/20 px-2 py-1 rounded">
                                 🇪🇸 Migração Completa!
                               </span>
+                            ) : (
+                              <button 
+                                onClick={() => {
+                                  const indexAtual = ETAPAS_FUNIL.indexOf(cliente.andamento);
+                                  if (indexAtual !== -1 && indexAtual < ETAPAS_FUNIL.length - 1) {
+                                    mudarAndamento(cliente.id, ETAPAS_FUNIL[indexAtual + 1]);
+                                  }
+                                }}
+                                className="text-xs bg-slate-800 text-amber-500 hover:bg-red-600/10 hover:text-red-400 px-3 py-1.5 rounded border border-slate-700 hover:border-red-500/30 transition font-medium flex items-center gap-1 ml-auto"
+                              >
+                                Próxima Etapa <ArrowRight className="h-3 w-3" />
+                              </button>
                             )}
                           </td>
                         </tr>
