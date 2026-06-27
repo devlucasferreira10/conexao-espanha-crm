@@ -185,6 +185,11 @@ export default function Home() {
     e.preventDefault();
     if (!novoNome || !novoNumero || !novaData) return alert('Preencha Nome, Data e Número!');
 
+    // Validação básica para garantir que não colocaram texto no lugar da data
+    if (!novaData.includes('/') && novaData.length > 4 && isNaN(Number(novaData))) {
+      return alert('Atenção: Insira uma data válida no campo "DATA DO CONTATO" (Ex: 26/06/2026)!');
+    }
+
     const { data, error } = await supabase
       .from('clientes')
       .insert([
@@ -202,7 +207,7 @@ export default function Home() {
       .select();
 
     if (error) {
-      alert('Erro ao salvar no banco de dados!');
+      alert('Erro ao salvar no banco de dados: ' + error.message);
       console.error(error);
     } else if (data) {
       setClientes([data[0], ...clientes]);
