@@ -78,7 +78,7 @@ export default function Home() {
   const [diaSelecionado, setDiaSelecionado] = useState('Segunda-feira');
   const [horaEspanha, setHoraEspanha] = useState('');
 
-  async function buscarClientes() {
+  const buscarClientes = async () => {
     setCarregando(true);
     const { data, error } = await supabase
       .from('clientes')
@@ -91,9 +91,9 @@ export default function Home() {
       setClientes(data);
     }
     setCarregando(false);
-  }
+  };
 
-  async function buscarAgenda() {
+  const buscarAgenda = async () => {
     const { data, error } = await supabase
       .from('agenda')
       .select('*')
@@ -104,7 +104,7 @@ export default function Home() {
     } else if (data) {
       setAgenda(data);
     }
-  }
+  };
 
   const configurarSessaoUsuario = useCallback((session: Session | null) => {
     setSessao(session);
@@ -128,7 +128,6 @@ export default function Home() {
         setIsMatheus(false);
       }
 
-      // Puxa o nome de exibição direto dos metadados do usuário do Supabase Auth
       const nomeMeta = session.user.user_metadata?.display_name;
       if (nomeMeta) {
         setNomeVendedoraLogada(nomeMeta);
@@ -189,7 +188,7 @@ export default function Home() {
     if (error) {
       alert('Erro ao atualizar senha: ' + error.message);
     } else {
-      alert('Senha updated com sucesso!');
+      alert('Senha atualizada com sucesso!');
       setDeveTrocarSenha(false);
       setNovaSenha('');
       setConfirmarNovaSenha('');
@@ -243,11 +242,16 @@ export default function Home() {
     e.preventDefault();
     if (!novoTituloCompromisso || !horaEspanha) return alert('Preencha o título e o horário!');
 
-    const [horas, minutos] = horaEspanha.split(':').map(Number);
-    let horasBr = horas - 5;
-    if (horasBr < 0) horasBr += 24;
+    const [horasEspanha, minutosEspanha] = horaEspanha.split(':').map(Number);
+    const dataFicticia = new Date();
+    dataFicticia.setHours(horasEspanha, minutosEspanha, 0, 0);
+
+    // Ajuste dinâmico inteligente baseado em Date
+    dataFicticia.setHours(dataFicticia.getHours() - 5); 
     
-    const horaBrasilFormatada = `${String(horasBr).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+    const horasBrFormatada = String(dataFicticia.getHours()).padStart(2, '0');
+    const minutosBrFormatados = String(dataFicticia.getMinutes()).padStart(2, '0');
+    const horaBrasilFormatada = `${horasBrFormatada}:${minutosBrFormatados}`;
 
     const { data, error } = await supabase
       .from('agenda')
@@ -347,15 +351,15 @@ export default function Home() {
   const totalEspanha = clientesDaSessao.filter(c => c.andamento === 'Chegada na Espanha').length;
   const totalCompleto = clientesDaSessao.filter(c => c.andamento === 'Migração Completa').length;
 
-  const faturamentoFechado = clientes.filter(c => c.andamento === 'Migração Completa').reduce((acc, c) => acc + (c.valor || 0), 0);
-  const faturamentoEmAndamento = clientes.filter(c => c.andamento !== 'Migração Completa').reduce((acc, c) => acc + (c.valor || 0), 0);
+  const faturamentoFechado = clientes.filter(c => c.andamento === 'Migração Completa').reduce((acc: number, c: Cliente) => acc + (c.valor || 0), 0);
+  const faturamentoEmAndamento = clientes.filter(c => c.andamento !== 'Migração Completa').reduce((acc: number, c: Cliente) => acc + (c.valor || 0), 0);
   
   const totalComissaoDevida = clientes.filter(c => c.andamento === 'Migração Completa').length * 300;
   const seuLucroLiquidoGeral = faturamentoFechado - totalComissaoDevida;
 
-  const totalConsultoria = clientes.filter(c => c.andamento === 'Migração Completa' && (c.servico === 'Consultoria' || !c.servico)).reduce((acc, c) => acc + (c.valor || 0), 0);
-  const totalRelocation = clientes.filter(c => c.andamento === 'Migração Completa' && c.servico === 'Relocation').reduce((acc, c) => acc + (c.valor || 0), 0);
-  const totalAmbos = clientes.filter(c => c.andamento === 'Migração Completa' && c.servico === 'Ambos').reduce((acc, c) => acc + (c.valor || 0), 0);
+  const totalConsultoria = clientes.filter(c => c.andamento === 'Migração Completa' && (c.servico === 'Consultoria' || !c.servico)).reduce((acc: number, c: Cliente) => acc + (c.valor || 0), 0);
+  const totalRelocation = clientes.filter(c => c.andamento === 'Migração Completa' && c.servico === 'Relocation').reduce((acc: number, c: Cliente) => acc + (c.valor || 0), 0);
+  const totalAmbos = clientes.filter(c => c.andamento === 'Migração Completa' && c.servico === 'Ambos').reduce((acc: number, c: Cliente) => acc + (c.valor || 0), 0);
 
   const obterMétricasVendedoras = () => {
     const dados: { [key: string]: { brutoFechado: number; totalContratos: number } } = {};
@@ -435,7 +439,7 @@ export default function Home() {
               <label className="block text-xs font-medium text-slate-400 mb-1">CONFIRME A NOVA SENHA</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                <input type="password" value={confirmarNovaSenha} onChange={e => setConfirmarNovaSenha(e.target.value)} placeholder="Repita a nova senha" className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                <input type="password" value={confirmarNovaSenha} onChange={e => setConfirmarNovaSenha(e.target.value)} placeholder="Repita a nova senha" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500" />
               </div>
             </div>
             <button type="submit" disabled={atualizandoSenha} className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 text-slate-950 font-bold py-2 px-4 rounded-lg text-sm transition shadow-md flex items-center justify-center gap-2">{atualizandoSenha ? 'Salvando...' : 'Definir Nova Senha'}</button>
@@ -472,7 +476,7 @@ export default function Home() {
         
         {abaAtual === 'perfil' && (
           /* TELA DE PERFIL */
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-xl mx-auto space-y-6 relative z-20 animate-in fade-in duration-200">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-xl mx-auto space-y-6 relative z-20">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2 text-amber-500 font-semibold uppercase tracking-wider text-sm">
                 <UserIcon className="h-5 w-5" />
@@ -517,7 +521,7 @@ export default function Home() {
 
         {abaAtual === 'crm' && (
           /* CONTEÚDO ORIGINAL DO CRM PRINCIPAL */
-          <div className="space-y-8 animate-in fade-in duration-200">
+          <div className="space-y-8">
             {/* CARD DA AGENDA DE COMPROMISSOS */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 lg:col-span-2 space-y-4">
@@ -595,7 +599,7 @@ export default function Home() {
 
             {/* RESUMOS OPERACIONAIS E GRÁFICOS DO ADMINISTRADOR */}
             {usuarioAtual === 'admin' && (
-              <div className="space-y-6 flex flex-col">
+              <div className="space-y-6">
                 <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Resumo Financeiro de Serviços</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex items-center justify-between">
