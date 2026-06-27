@@ -262,30 +262,39 @@ export default function Home() {
   };
 
   const mudarAndamento = async (id: number, novoAndamento: string) => {
+    // Atualiza imediatamente na tela (Optimistic Update)
+    setClientes(prevClientes => 
+      prevClientes.map(c => c.id === id ? { ...c, andamento: novoAndamento } : c)
+    );
+
     const { error } = await supabase
       .from('clientes')
       .update({ andamento: novoAndamento })
       .eq('id', id);
 
     if (error) {
-      alert('Erro ao atualizar status!');
-      console.error(error);
-    } else {
-      setClientes(clientes.map(c => c.id === id ? { ...c, andamento: novoAndamento } : c));
+      alert('Erro ao salvar novo status no banco: ' + error.message);
+      // Se der erro, desfaz a alteração na tela buscando os dados reais
+      buscarClientes();
     }
   };
 
   const salvarEdicaoObs = async (id: number) => {
+    // Atualiza imediatamente na tela
+    setClientes(prevClientes => 
+      prevClientes.map(c => c.id === id ? { ...c, obs: textoObsEditando } : c)
+    );
+    setClienteEditandoObs(null);
+
     const { error } = await supabase
       .from('clientes')
       .update({ obs: textoObsEditando })
       .eq('id', id);
 
     if (error) {
-      alert('Erro ao atualizar observação: ' + error.message);
-    } else {
-      setClientes(clientes.map(c => c.id === id ? { ...c, obs: textoObsEditando } : c));
-      setClienteEditandoObs(null);
+      alert('Erro ao salvar observação no banco: ' + error.message);
+      // Se der erro, desfaz a alteração na tela buscando os dados reais
+      buscarClientes();
     }
   };
 
