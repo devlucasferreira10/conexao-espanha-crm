@@ -189,7 +189,7 @@ export default function Home() {
     if (error) {
       alert('Erro ao atualizar senha: ' + error.message);
     } else {
-      alert('Senha atualizada com sucesso!');
+      alert('Senha updated com sucesso!');
       setDeveTrocarSenha(false);
       setNovaSenha('');
       setConfirmarNovaSenha('');
@@ -457,21 +457,22 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-3">
           <button 
+            type="button"
             onClick={() => setAbaAtual(abaAtual === 'crm' ? 'perfil' : 'crm')}
-            className={`flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 text-xs transition ${abaAtual === 'perfil' ? 'border-amber-500 bg-slate-800/80 text-amber-400' : ''}`}
+            className={`flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-white transition z-50 ${abaAtual === 'perfil' ? 'border-amber-500 bg-slate-800/80 text-amber-400' : ''}`}
           >
             <UserIcon className="h-3.5 w-3.5 text-amber-500" />
-            <span>Olá, <strong className="text-white">{nomeVendedoraLogada}</strong> ({isMatheus ? '👑 Diretor Matheus' : usuarioAtual === 'admin' ? '👑 Admin' : 'Vendedora'})</span>
+            <span>Olá, <strong>{nomeVendedoraLogada}</strong> ({isMatheus ? '👑 Diretor Matheus' : usuarioAtual === 'admin' ? '👑 Admin' : 'Vendedora'})</span>
           </button>
           <button onClick={handleLogout} className="bg-slate-800 hover:bg-red-600/20 border border-slate-700 hover:border-red-500/30 text-slate-400 hover:text-red-400 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition"><LogOut className="h-3.5 w-3.5" /> Sair</button>
         </div>
       </header>
 
-      <main className="p-6 max-w-7xl mx-auto space-y-8">
+      <main className="p-6 max-w-7xl mx-auto space-y-8 relative z-10">
         
-        {abaAtual === 'perfil' ? (
+        {abaAtual === 'perfil' && (
           /* TELA DE PERFIL */
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-xl mx-auto space-y-6">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-xl mx-auto space-y-6 relative z-20 animate-in fade-in duration-200">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2 text-amber-500 font-semibold uppercase tracking-wider text-sm">
                 <UserIcon className="h-5 w-5" />
@@ -512,9 +513,11 @@ export default function Home() {
               </button>
             </form>
           </div>
-        ) : (
+        )}
+
+        {abaAtual === 'crm' && (
           /* CONTEÚDO ORIGINAL DO CRM PRINCIPAL */
-          <>
+          <div className="space-y-8 animate-in fade-in duration-200">
             {/* CARD DA AGENDA DE COMPROMISSOS */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 lg:col-span-2 space-y-4">
@@ -592,7 +595,7 @@ export default function Home() {
 
             {/* RESUMOS OPERACIONAIS E GRÁFICOS DO ADMINISTRADOR */}
             {usuarioAtual === 'admin' && (
-              <div className="space-y-6">
+              <div className="space-y-6 flex flex-col">
                 <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Resumo Financeiro de Serviços</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex items-center justify-between">
@@ -926,7 +929,7 @@ export default function Home() {
                 )}
               </div>
             </div>
-          </>
+          </div>
         )}
 
       </main>
