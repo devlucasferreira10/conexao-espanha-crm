@@ -67,6 +67,11 @@ export default function Home() {
   const [clienteEditandoObs, setClienteEditandoObs] = useState<number | null>(null);
   const [textoObsEditando, setTextoObsEditando] = useState('');
 
+  // Estados para a aba Perfil
+  const [abaAtual, setAbaAtual] = useState<'crm' | 'perfil'>('crm');
+  const [novoNomeExibicao, setNovoNomeExibicao] = useState('');
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
+
   // Estados da Agenda
   const [agenda, setAgenda] = useState<Compromisso[]>([]);
   const [novoTituloCompromisso, setNovoTituloCompromisso] = useState('');
@@ -115,17 +120,26 @@ export default function Home() {
       if (email.toLowerCase() === 'matheus@admin.com') {
         setUsuarioAtual('admin');
         setIsMatheus(true);
-        setNomeVendedoraLogada('Matheus');
       } else if (email.endsWith('@admin.com')) {
         setUsuarioAtual('admin');
         setIsMatheus(false);
-        setNomeVendedoraLogada('Admin');
       } else {
         setUsuarioAtual('vendedora');
         setIsMatheus(false);
-        const primeiroNome = email.split('@')[0];
-        setNomeVendedoraLogada(primeiroNome.charAt(0).toUpperCase() + primeiroNome.slice(1));
       }
+
+      // Puxa o nome de exibição direto dos metadados do usuário do Supabase Auth
+      const nomeMeta = session.user.user_metadata?.display_name;
+      if (nomeMeta) {
+        setNomeVendedoraLogada(nomeMeta);
+        setNovoNomeExibicao(nomeMeta);
+      } else {
+        const primeiroNome = email.split('@')[0];
+        const nomeFormatado = primeiroNome.charAt(0).toUpperCase() + primeiroNome.slice(1);
+        setNomeVendedoraLogada(nomeFormatado);
+        setNovoNomeExibicao(nomeFormatado);
+      }
+
       buscarClientes();
       buscarAgenda();
     } else {
@@ -175,8 +189,10 @@ export default function Home() {
     if (error) {
       alert('Erro ao atualizar senha: ' + error.message);
     } else {
-      alert('Senha atualizada com sucesso! Bem-vinda ao CRM.');
+      alert('Senha atualizada com sucesso!');
       setDeveTrocarSenha(false);
+      setNovaSenha('');
+      setConfirmarNovaSenha('');
     }
     setAtualizandoSenha(false);
   };
@@ -262,7 +278,6 @@ export default function Home() {
   };
 
   const mudarAndamento = async (id: number, novoAndamento: string) => {
-    // Atualiza imediatamente na tela (Optimistic Update)
     setClientes(prevClientes => 
       prevClientes.map(c => c.id === id ? { ...c, andamento: novoAndamento } : c)
     );
@@ -274,13 +289,11 @@ export default function Home() {
 
     if (error) {
       alert('Erro ao salvar novo status no banco: ' + error.message);
-      // Se der erro, desfaz a alteração na tela buscando os dados reais
       buscarClientes();
     }
   };
 
   const salvarEdicaoObs = async (id: number) => {
-    // Atualiza imediatamente na tela
     setClientes(prevClientes => 
       prevClientes.map(c => c.id === id ? { ...c, obs: textoObsEditando } : c)
     );
@@ -293,12 +306,27 @@ export default function Home() {
 
     if (error) {
       alert('Erro ao salvar observação no banco: ' + error.message);
-      // Se der erro, desfaz a alteração na tela buscando os dados reais
       buscarClientes();
     }
   };
 
- 
+  const handleAtualizarPerfil = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novoNomeExibicao.trim()) return alert('O nome de exibição não pode ficar vazio!');
+
+    setSalvandoPerfil(true);
+    const { error } = await supabase.auth.updateUser({
+      data: { display_name: novoNomeExibicao.trim() }
+    });
+
+    if (error) {
+      alert('Erro ao atualizar perfil: ' + error.message);
+    } else {
+      alert('Perfil atualizado com sucesso!');
+      setNomeVendedoraLogada(novoNomeExibicao.trim());
+    }
+    setSalvandoPerfil(false);
+  };
 
   const clientesDaSessao = usuarioAtual === 'vendedora' 
     ? clientes.filter(c => c.vendedora.toLowerCase() === nomeVendedoraLogada.toLowerCase())
@@ -423,434 +451,483 @@ export default function Home() {
       <div className="w-full h-1 bg-gradient-to-r from-red-600 via-amber-500 to-red-600" />
 
       <header className="border-b border-slate-800 bg-slate-950 p-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setAbaAtual('crm')}>
           <Briefcase className="text-red-500 h-6 w-6" />
           <span className="font-bold text-xl tracking-wider text-white uppercase">Conexão Espanha</span>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setAbaAtual(abaAtual === 'crm' ? 'perfil' : 'crm')}
+            className={`flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 text-xs transition ${abaAtual === 'perfil' ? 'border-amber-500 bg-slate-800/80 text-amber-400' : ''}`}
+          >
             <UserIcon className="h-3.5 w-3.5 text-amber-500" />
             <span>Olá, <strong className="text-white">{nomeVendedoraLogada}</strong> ({isMatheus ? '👑 Diretor Matheus' : usuarioAtual === 'admin' ? '👑 Admin' : 'Vendedora'})</span>
-          </div>
+          </button>
           <button onClick={handleLogout} className="bg-slate-800 hover:bg-red-600/20 border border-slate-700 hover:border-red-500/30 text-slate-400 hover:text-red-400 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition"><LogOut className="h-3.5 w-3.5" /> Sair</button>
         </div>
       </header>
 
       <main className="p-6 max-w-7xl mx-auto space-y-8">
         
-        {/* CARD DA AGENDA DE COMPROMISSOS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-2 text-amber-500 font-semibold text-base uppercase tracking-wider border-b border-slate-800 pb-3">
-              <Calendar className="h-5 w-5" />
-              <h3>Disponibilidade e Agenda da Semana (Matheus)</h3>
+        {abaAtual === 'perfil' ? (
+          /* TELA DE PERFIL */
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 max-w-xl mx-auto space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2 text-amber-500 font-semibold uppercase tracking-wider text-sm">
+                <UserIcon className="h-5 w-5" />
+                <h2>Meu Perfil e Configurações</h2>
+              </div>
+              <button onClick={() => setAbaAtual('crm')} className="text-xs text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-2.5 py-1 rounded transition">Voltar ao CRM</button>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[320px] overflow-y-auto pr-1">
-              {DIAS_SEMANA.map((dia) => {
-                const compromissosDoDia = agenda.filter(a => a.dia_semana === dia);
-                return (
-                  <div key={dia} className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
-                    <p className="text-xs font-bold text-slate-300 border-b border-slate-800 pb-1 uppercase tracking-wide">{dia}</p>
-                    {compromissosDoDia.length === 0 ? (
-                      <p className="text-[11px] text-slate-500 italic py-1">Nenhum horário fixado.</p>
+
+            {/* Formulário 1: Mudar Nome */}
+            <form onSubmit={handleAtualizarPerfil} className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Dados Públicos</h3>
+              <div>
+                <label className="block text-[10px] font-medium text-slate-500 mb-1">NOME DE EXIBIÇÃO NO CRM</label>
+                <input type="text" value={novoNomeExibicao} onChange={e => setNovoNomeExibicao(e.target.value)} placeholder="Ex: Carol Menezes" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500" />
+              </div>
+              <button type="submit" disabled={salvandoPerfil} className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold py-2 px-4 rounded-lg transition shadow-md disabled:bg-slate-800">
+                {salvandoPerfil ? 'Salvando...' : 'Salvar Alterações de Nome'}
+              </button>
+            </form>
+
+            <div className="border-t border-slate-900 my-2" />
+
+            {/* Formulário 2: Mudar Senha */}
+            <form onSubmit={handleAtualizarSenha} className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Segurança de Acesso</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-medium text-slate-500 mb-1">NOVA SENHA (MÍN. 6 DÍGITOS)</label>
+                  <input type="password" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="••••••••" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-slate-500 mb-1">CONFIRMAR NOVA SENHA</label>
+                  <input type="password" value={confirmarNovaSenha} onChange={e => setConfirmarNovaSenha(e.target.value)} placeholder="••••••••" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500" />
+                </div>
+              </div>
+              <button type="submit" disabled={atualizandoSenha} className="bg-slate-800 hover:bg-red-600/20 border border-slate-700 hover:border-red-500/30 text-slate-300 hover:text-red-400 text-xs font-bold py-2 px-4 rounded-lg transition shadow-md disabled:bg-slate-800">
+                {atualizandoSenha ? 'Alterando...' : 'Atualizar Senha de Segurança'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          /* CONTEÚDO ORIGINAL DO CRM PRINCIPAL */
+          <>
+            {/* CARD DA AGENDA DE COMPROMISSOS */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 lg:col-span-2 space-y-4">
+                <div className="flex items-center gap-2 text-amber-500 font-semibold text-base uppercase tracking-wider border-b border-slate-800 pb-3">
+                  <Calendar className="h-5 w-5" />
+                  <h3>Disponibilidade e Agenda da Semana (Matheus)</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[320px] overflow-y-auto pr-1">
+                  {DIAS_SEMANA.map((dia) => {
+                    const compromissosDoDia = agenda.filter(a => a.dia_semana === dia);
+                    return (
+                      <div key={dia} className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
+                        <p className="text-xs font-bold text-slate-300 border-b border-slate-800 pb-1 uppercase tracking-wide">{dia}</p>
+                        {compromissosDoDia.length === 0 ? (
+                          <p className="text-[11px] text-slate-500 italic py-1">Nenhum horário fixado.</p>
+                        ) : (
+                          compromissosDoDia.map(comp => (
+                            <div key={comp.id} className="flex justify-between items-center bg-slate-950/40 px-2 py-1.5 rounded border border-slate-800 text-xs">
+                              <div className="space-y-0.5">
+                                <p className="font-semibold text-white truncate max-w-[140px]">{comp.titulo}</p>
+                                <p className="text-[10px] text-slate-400">
+                                  🇪🇸 <strong className="text-amber-500">{comp.horario_espanha.slice(0,5)}</strong> | 🇧🇷 <strong className="text-red-400">{comp.horario_brasil.slice(0,5)}</strong>
+                                </p>
+                              </div>
+                              {isMatheus && (
+                                <button onClick={() => handleDeletarCompromisso(comp.id)} className="text-slate-600 hover:text-red-400 p-1 transition"><Trash2 className="h-3.5 w-3.5" /></button>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {isMatheus ? (
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-red-500 font-semibold text-xs uppercase tracking-wider">
+                      <Plus className="h-4 w-4" />
+                      <h4>Adicionar Horário na Agenda</h4>
+                    </div>
+                    <form onSubmit={handleAdicionarCompromisso} className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-medium text-slate-400 mb-1">COMPROMISSO / TÍTULO</label>
+                        <input type="text" value={novoTituloCompromisso} onChange={e => setNovoTituloCompromisso(e.target.value)} placeholder="Ex: Call de Fechamento" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-red-500" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-medium text-slate-400 mb-1">DIA DA SEMANA</label>
+                          <select value={diaSelecionado} onChange={e => setDiaSelecionado(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                            {DIAS_SEMANA.map(d => <option key={d} value={d}>{d}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-slate-400 mb-1">HORA ESPANHA (🇪🇸)</label>
+                          <input type="time" value={horaEspanha} onChange={e => setHoraEspanha(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-red-500" />
+                        </div>
+                      </div>
+                      <button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 rounded-lg transition shadow-md mt-2">Fixar na Agenda da Equipe</button>
+                    </form>
+                  </div>
+                  <p className="text-[10px] text-slate-500 border-t border-slate-900 pt-2 italic">A hora oficial no Brasil (Fuso -5h) será calculada e exibida de forma automática.</p>
+                </div>
+              ) : (
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col justify-center items-center text-center space-y-2">
+                  <Clock className="text-slate-700 h-8 w-8" />
+                  <p className="text-xs font-semibold text-slate-400">Sincronização de Fusos</p>
+                  <p className="text-[11px] text-slate-500 max-w-[200px]">Consulte a tabela ao lado para agendar reuniões com os leads nos horários disponíveis do Matheus.</p>
+                </div>
+              )}
+            </div>
+
+            {/* RESUMOS OPERACIONAIS E GRÁFICOS DO ADMINISTRADOR */}
+            {usuarioAtual === 'admin' && (
+              <div className="space-y-6">
+                <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Resumo Financeiro de Serviços</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Seu Lucro Líquido Confirmado (Bruto descontando as comissões)</p>
+                      <p className="text-3xl font-bold text-red-500 mt-1">
+                        R$ {seuLucroLiquidoGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="bg-red-500/10 p-3 rounded-lg text-red-500">
+                      <DollarSign className="h-6 w-6" />
+                    </div>
+                  </div>
+                  <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Pipeline Potencial Bruto (Em Aberto)</p>
+                      <p className="text-3xl font-bold text-amber-500 mt-1">
+                        R$ {faturamentoEmAndamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="bg-amber-500/10 p-3 rounded-lg text-amber-500">
+                      <DollarSign className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-900 pb-2">
+                    <PieChart className="h-4 w-4 text-red-500" />
+                    <h3>Faturamento por Modalidade (Contratos Fechados)</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                    <div className="bg-slate-900/50 p-3.5 rounded-lg border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Consultoria</span>
+                      <span className="text-lg font-bold text-white block mt-1">R$ {totalConsultoria.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="bg-slate-900/50 p-3.5 rounded-lg border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Relocation</span>
+                      <span className="text-lg font-bold text-white block mt-1">R$ {totalRelocation.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="bg-slate-900/50 p-3.5 rounded-lg border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Ambos</span>
+                      <span className="text-lg font-bold text-white block mt-1">R$ {totalAmbos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-slate-800 bg-slate-900/30 flex items-center gap-2">
+                    <Percent className="h-4 w-4 text-amber-500" />
+                    <h3 className="font-semibold text-sm text-white uppercase tracking-wider">Desempenho e Comissões (R$ 300,00 fixos por Fechamento)</h3>
+                  </div>
+                  <div className="divide-y divide-slate-800">
+                    {obterMétricasVendedoras().length === 0 ? (
+                      <p className="p-4 text-xs text-slate-500 text-center">Nenhum dado financeiro coletado.</p>
                     ) : (
-                      compromissosDoDia.map(comp => (
-                        <div key={comp.id} className="flex justify-between items-center bg-slate-950/40 px-2 py-1.5 rounded border border-slate-800 text-xs">
-                          <div className="space-y-0.5">
-                            <p className="font-semibold text-white truncate max-w-[140px]">{comp.titulo}</p>
-                            <p className="text-[10px] text-slate-400">
-                              🇪🇸 <strong className="text-amber-500">{comp.horario_espanha.slice(0,5)}</strong> | 🇧🇷 <strong className="text-red-400">{comp.horario_brasil.slice(0,5)}</strong>
-                            </p>
+                      obterMétricasVendedoras().map((vend) => (
+                        <div key={vend.nome} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-slate-900/10 transition">
+                          <div>
+                            <span className="text-xs text-slate-400 block font-medium">VENDEDORA</span>
+                            <span className="text-sm font-bold text-white">{vend.nome}</span>
                           </div>
-                          {isMatheus && (
-                            <button onClick={() => handleDeletarCompromisso(comp.id)} className="text-slate-600 hover:text-red-400 p-1 transition"><Trash2 className="h-3.5 w-3.5" /></button>
-                          )}
+                          <div className="grid grid-cols-3 gap-6 sm:text-right">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase tracking-wider">Bruto Fechado</span>
+                              <span className="text-sm font-semibold text-slate-300">
+                                R$ {vend.faturamentoBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-amber-400 block uppercase tracking-wider font-semibold">Comissão Devida</span>
+                              <span className="text-sm font-bold text-amber-500">
+                                R$ {vend.comissao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] text-slate-500 block">({vend.contratosFechados} {vend.contratosFechados === 1 ? 'contrato' : 'contratos'})</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-red-400 block uppercase tracking-wider font-semibold">Seu Retorno</span>
+                              <span className="text-sm font-bold text-red-500">
+                                R$ {vend.seuLucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       ))
                     )}
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {isMatheus ? (
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-red-500 font-semibold text-xs uppercase tracking-wider">
-                  <Plus className="h-4 w-4" />
-                  <h4>Adicionar Horário na Agenda</h4>
                 </div>
-                <form onSubmit={handleAdicionarCompromisso} className="space-y-3">
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Fluxo do Processo ({usuarioAtual === 'vendedora' ? 'Minhas Etapas' : 'Geral'})</h2>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
                   <div>
-                    <label className="block text-[10px] font-medium text-slate-400 mb-1">COMPROMISSO / TÍTULO</label>
-                    <input type="text" value={novoTituloCompromisso} onChange={e => setNovoTituloCompromisso(e.target.value)} placeholder="Ex: Call de Fechamento" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-red-500" />
+                    <p className="text-xs text-slate-400 font-medium">1º Contato</p>
+                    <p className="text-2xl font-bold text-white mt-1">{totalPrimeiroContato}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-800 p-2 rounded-lg text-slate-400 hidden sm:block">
+                    <Users className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Negociação</p>
+                    <p className="text-2xl font-bold text-amber-500 mt-1">{totalNegociacao}</p>
+                  </div>
+                  <div className="bg-amber-500/10 p-2 rounded-lg text-amber-500 hidden sm:block">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Com Matheus</p>
+                    <p className="text-2xl font-bold text-amber-400 mt-1">{totalMatheus}</p>
+                  </div>
+                  <div className="bg-amber-500/10 p-2 rounded-lg text-amber-400 hidden sm:block">
+                    <MessageSquare className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Na Espanha</p>
+                    <p className="text-2xl font-bold text-red-500 mt-1">{totalEspanha}</p>
+                  </div>
+                  <div className="bg-red-500/10 p-2 rounded-lg text-red-500 hidden sm:block">
+                    <Plane className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between col-span-2 md:col-span-1">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Concluídos 🎉</p>
+                    <p className="text-2xl font-bold text-red-500 mt-1">{totalCompleto}</p>
+                  </div>
+                  <div className="bg-red-500/10 p-2 rounded-lg text-red-500 hidden sm:block">
+                    <CheckCircle className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CADASTRO DE CLIENTE COM DROP DOWN DE TIPO DE SERVIÇO */}
+            {usuarioAtual === 'vendedora' && (
+              <div className="bg-slate-950 p-6 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-2 mb-4 text-red-500">
+                  <UserPlus className="h-5 w-5" />
+                  <h2 className="text-lg font-semibold text-white">Cadastrar Novo Cliente</h2>
+                </div>
+                
+                <form onSubmit={handleCadastrarCliente} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div>
-                      <label className="block text-[10px] font-medium text-slate-400 mb-1">DIA DA SEMANA</label>
-                      <select value={diaSelecionado} onChange={e => setDiaSelecionado(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
-                        {DIAS_SEMANA.map(d => <option key={d} value={d}>{d}</option>)}
+                      <label className="block text-xs font-medium text-slate-400 mb-1">NOME</label>
+                      <input type="text" value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">DATA DO CONTATO</label>
+                      <input type="text" value={novaData} onChange={e => setNovaData(e.target.value)} placeholder="Ex: 23/06/2026" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">NÚMERO</label>
+                      <input type="text" value={novoNumero} onChange={e => setNovoNumero(e.target.value)} placeholder="Ex: (11) 99999-9999" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">TIPO DE SERVIÇO</label>
+                      <select value={servicoSelecionado} onChange={e => setServicoSelecionado(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+                        {OPCOES_SERVICO.map(opcao => (
+                          <option key={opcao} value={opcao}>{opcao}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-medium text-slate-400 mb-1">HORA ESPANHA (🇪🇸)</label>
-                      <input type="time" value={horaEspanha} onChange={e => setHoraEspanha(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-red-500" />
+                      <label className="block text-xs font-medium text-slate-400 mb-1">VALOR DO FECHAMENTO (R$)</label>
+                      <input type="number" value={novoValor} onChange={e => setNovoValor(e.target.value)} placeholder="Ex: 3500" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 rounded-lg transition shadow-md mt-2">Fixar na Agenda da Equipe</button>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">OBS (Observações)</label>
+                    <textarea value={novaObs} onChange={e => setNovaObs(e.target.value)} placeholder="Digite detalhes do caso..." rows={2} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 resize-none" />
+                  </div>
+                  <div className="flex justify-end">
+                    <button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-6 rounded-lg text-sm transition shadow-md">Salvar Cliente</button>
+                  </div>
                 </form>
               </div>
-              <p className="text-[10px] text-slate-500 border-t border-slate-900 pt-2 italic">A hora oficial no Brasil (Fuso -5h) será calculada e exibida de forma automática.</p>
-            </div>
-          ) : (
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col justify-center items-center text-center space-y-2">
-              <Clock className="text-slate-700 h-8 w-8" />
-              <p className="text-xs font-semibold text-slate-400">Sincronização de Fusos</p>
-              <p className="text-[11px] text-slate-500 max-w-[200px]">Consulte a tabela ao lado para agendar reuniões com os leads nos horários disponíveis do Matheus.</p>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* RESUMOS OPERACIONAIS E GRÁFICOS DO ADMINISTRADOR */}
-        {usuarioAtual === 'admin' && (
-          <div className="space-y-6">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Resumo Financeiro de Serviços</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400 font-medium">Seu Lucro Líquido Confirmado (Bruto descontando as comissões)</p>
-                  <p className="text-3xl font-bold text-red-500 mt-1">
-                    R$ {seuLucroLiquidoGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
+            {/* TABELA DE CONTATOS FILTRADOS */}
+            <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <Users className="h-5 w-5 text-red-500" />
+                  <h3 className="font-semibold text-white">
+                    {usuarioAtual === 'admin' ? 'Painel de Monitoramento de Migração (Geral)' : 'Meus Contatos Salvos'}
+                  </h3>
                 </div>
-                <div className="bg-red-500/10 p-3 rounded-lg text-red-500">
-                  <DollarSign className="h-6 w-6" />
+                
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                    <input 
+                      type="text"
+                      value={termoPesquisa}
+                      onChange={e => setTermoPesquisa(e.target.value)}
+                      placeholder="Buscar por nome, telefone ou data..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-red-500 placeholder-slate-500"
+                    />
+                  </div>
+                  <span className="text-xs bg-slate-800 text-slate-400 px-2.5 py-1.5 rounded shrink-0 font-medium">
+                    {clientesFiltrados.length} listados
+                  </span>
                 </div>
               </div>
-              <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400 font-medium">Pipeline Potencial Bruto (Em Aberto)</p>
-                  <p className="text-3xl font-bold text-amber-500 mt-1">
-                    R$ {faturamentoEmAndamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="bg-amber-500/10 p-3 rounded-lg text-amber-500">
-                  <DollarSign className="h-6 w-6" />
-                </div>
-              </div>
-            </div>
 
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3">
-              <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-900 pb-2">
-                <PieChart className="h-4 w-4 text-red-500" />
-                <h3>Faturamento por Modalidade (Contratos Fechados)</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
-                <div className="bg-slate-900/50 p-3.5 rounded-lg border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Consultoria</span>
-                  <span className="text-lg font-bold text-white block mt-1">R$ {totalConsultoria.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="bg-slate-900/50 p-3.5 rounded-lg border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Relocation</span>
-                  <span className="text-lg font-bold text-white block mt-1">R$ {totalRelocation.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="bg-slate-900/50 p-3.5 rounded-lg border border-slate-800">
-                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Ambos</span>
-                  <span className="text-lg font-bold text-white block mt-1">R$ {totalAmbos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
-              <div className="p-4 border-b border-slate-800 bg-slate-900/30 flex items-center gap-2">
-                <Percent className="h-4 w-4 text-amber-500" />
-                <h3 className="font-semibold text-sm text-white uppercase tracking-wider">Desempenho e Comissões (R$ 300,00 fixos por Fechamento)</h3>
-              </div>
-              <div className="divide-y divide-slate-800">
-                {obterMétricasVendedoras().length === 0 ? (
-                  <p className="p-4 text-xs text-slate-500 text-center">Nenhum dado financeiro coletado.</p>
+              <div className="overflow-x-auto">
+                {carregando ? (
+                  <div className="p-8 text-center text-slate-400">Carregando contatos...</div>
                 ) : (
-                  obterMétricasVendedoras().map((vend) => (
-                    <div key={vend.nome} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:bg-slate-900/10 transition">
-                      <div>
-                        <span className="text-xs text-slate-400 block font-medium">VENDEDORA</span>
-                        <span className="text-sm font-bold text-white">{vend.nome}</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-6 sm:text-right">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block uppercase tracking-wider">Bruto Fechado</span>
-                          <span className="text-sm font-semibold text-slate-300">
-                            R$ {vend.faturamentoBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-amber-400 block uppercase tracking-wider font-semibold">Comissão Devida</span>
-                          <span className="text-sm font-bold text-amber-500">
-                            R$ {vend.comissao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                          <span className="text-[10px] text-slate-500 block">({vend.contratosFechados} {vend.contratosFechados === 1 ? 'contrato' : 'contratos'})</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-red-400 block uppercase tracking-wider font-semibold">Seu Retorno</span>
-                          <span className="text-sm font-bold text-red-500">
-                            R$ {vend.seuLucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900/50 text-slate-400 text-xs font-semibold uppercase border-b border-slate-800">
+                        <th className="p-4">Nome</th>
+                        <th className="p-4">Data do Contato</th>
+                        <th className="p-4">Número</th>
+                        <th className="p-4">Serviço</th>
+                        <th className="p-4">Valor</th>
+                        <th className="p-4">Quem Entrou em Contato</th>
+                        <th className="p-4">Obs</th>
+                        <th className="p-4">Andamento</th>
+                        <th className="p-4 text-right">Ações de Evolução</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-sm">
+                      {clientesFiltrados.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-slate-500">
+                            {termoPesquisa ? 'Nenhum resultado encontrado para esta busca.' : 'Nenhum cliente cadastrado neste filtro.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        clientesFiltrados.map((cliente) => {
+                          return (
+                            <tr key={cliente.id} className="hover:bg-slate-900/30 transition">
+                              <td className="p-4 font-medium text-white">{cliente.nome}</td>
+                              <td className="p-4 text-slate-400">{cliente.data_contato}</td>
+                              <td className="p-4 text-slate-400">{cliente.numero}</td>
+                              <td className="p-4">
+                                <span className="text-xs bg-slate-900 px-2 py-1 rounded border border-slate-800 text-slate-300 font-medium">
+                                  {cliente.servico || 'Consultoria'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-amber-500 font-medium">
+                                R$ {(cliente.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="p-4">
+                                <span className="bg-slate-800 text-slate-300 text-xs px-2.5 py-1 rounded-full font-medium">
+                                  {cliente.vendedora}
+                                </span>
+                              </td>
+                              
+                              <td className="p-4 text-slate-400 max-w-xs">
+                                {clienteEditandoObs === cliente.id ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <input 
+                                      type="text" 
+                                      value={textoObsEditando} 
+                                      onChange={e => setTextoObsEditando(e.target.value)}
+                                      className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none w-full"
+                                    />
+                                    <button onClick={() => salvarEdicaoObs(cliente.id)} className="text-emerald-500 hover:bg-emerald-500/10 p-1 rounded transition"><Check className="h-3.5 w-3.5" /></button>
+                                    <button onClick={() => setClienteEditandoObs(null)} className="text-rose-500 hover:bg-rose-500/10 p-1 rounded transition"><X className="h-3.5 w-3.5" /></button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-between gap-1 group">
+                                    <div className="flex items-center gap-1 truncate" title={cliente.obs}>
+                                      <FileText className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                                      <span>{cliente.obs || 'Nenhuma nota'}</span>
+                                    </div>
+                                    <button 
+                                      onClick={() => {
+                                        setClienteEditandoObs(cliente.id);
+                                        setTextoObsEditando(cliente.obs || '');
+                                      }} 
+                                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-amber-500 p-1 transition shrink-0"
+                                      title="Editar Observação"
+                                    >
+                                      <Edit2 className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="p-4">
+                                <select
+                                  value={cliente.andamento}
+                                  onChange={(e) => mudarAndamento(cliente.id, e.target.value)}
+                                  className="text-xs font-semibold px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white focus:outline-none cursor-pointer"
+                                >
+                                  {ETAPAS_FUNIL.map((etapa) => (
+                                    <option key={etapa} value={etapa}>{etapa}</option>
+                                  ))}
+                                </select>
+                              </td>
+
+                              <td className="p-4 text-right">
+                                {cliente.andamento === 'Migração Completa' ? (
+                                  <span className="text-xs text-red-500 font-semibold bg-red-500/10 border border-red-500/20 px-2 py-1 rounded">
+                                    🇪🇸 Migração Completa!
+                                  </span>
+                                ) : (
+                                  <button 
+                                    onClick={() => {
+                                      const indexAtual = ETAPAS_FUNIL.indexOf(cliente.andamento);
+                                      if (indexAtual !== -1 && indexAtual < ETAPAS_FUNIL.length - 1) {
+                                        mudarAndamento(cliente.id, ETAPAS_FUNIL[indexAtual + 1]);
+                                      }
+                                    }}
+                                    className="text-xs bg-slate-800 text-amber-500 hover:bg-red-600/10 hover:text-red-400 px-3 py-1.5 rounded border border-slate-700 hover:border-red-500/30 transition font-medium flex items-center gap-1 ml-auto"
+                                  >
+                                    Próxima Etapa <ArrowRight className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>
-          </div>
+          </>
         )}
-
-        <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Fluxo do Processo ({usuarioAtual === 'vendedora' ? 'Minhas Etapas' : 'Geral'})</h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-400 font-medium">1º Contato</p>
-                <p className="text-2xl font-bold text-white mt-1">{totalPrimeiroContato}</p>
-              </div>
-              <div className="bg-slate-800 p-2 rounded-lg text-slate-400 hidden sm:block">
-                <Users className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Negociação</p>
-                <p className="text-2xl font-bold text-amber-500 mt-1">{totalNegociacao}</p>
-              </div>
-              <div className="bg-amber-500/10 p-2 rounded-lg text-amber-500 hidden sm:block">
-                <Clock className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Com Matheus</p>
-                <p className="text-2xl font-bold text-amber-400 mt-1">{totalMatheus}</p>
-              </div>
-              <div className="bg-amber-500/10 p-2 rounded-lg text-amber-400 hidden sm:block">
-                <MessageSquare className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Na Espanha</p>
-                <p className="text-2xl font-bold text-red-500 mt-1">{totalEspanha}</p>
-              </div>
-              <div className="bg-red-500/10 p-2 rounded-lg text-red-500 hidden sm:block">
-                <Plane className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between col-span-2 md:col-span-1">
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Concluídos 🎉</p>
-                <p className="text-2xl font-bold text-red-500 mt-1">{totalCompleto}</p>
-              </div>
-              <div className="bg-red-500/10 p-2 rounded-lg text-red-500 hidden sm:block">
-                <CheckCircle className="h-5 w-5" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* CADASTRO DE CLIENTE COM DROP DOWN DE TIPO DE SERVIÇO */}
-        {usuarioAtual === 'vendedora' && (
-          <div className="bg-slate-950 p-6 rounded-xl border border-slate-800">
-            <div className="flex items-center gap-2 mb-4 text-red-500">
-              <UserPlus className="h-5 w-5" />
-              <h2 className="text-lg font-semibold text-white">Cadastrar Novo Cliente</h2>
-            </div>
-            
-            <form onSubmit={handleCadastrarCliente} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">NOME</label>
-                  <input type="text" value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">DATA DO CONTATO</label>
-                  <input type="text" value={novaData} onChange={e => setNovaData(e.target.value)} placeholder="Ex: 23/06/2026" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">NÚMERO</label>
-                  <input type="text" value={novoNumero} onChange={e => setNovoNumero(e.target.value)} placeholder="Ex: (11) 99999-9999" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">TIPO DE SERVIÇO</label>
-                  <select value={servicoSelecionado} onChange={e => setServicoSelecionado(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
-                    {OPCOES_SERVICO.map(opcao => (
-                      <option key={opcao} value={opcao}>{opcao}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">VALOR DO FECHAMENTO (R$)</label>
-                  <input type="number" value={novoValor} onChange={e => setNovoValor(e.target.value)} placeholder="Ex: 3500" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">OBS (Observações)</label>
-                <textarea value={novaObs} onChange={e => setNovaObs(e.target.value)} placeholder="Digite detalhes do caso..." rows={2} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 resize-none" />
-              </div>
-              <div className="flex justify-end">
-                <button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-6 rounded-lg text-sm transition shadow-md">Salvar Cliente</button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* TABELA DE CONTATOS FILTRADOS */}
-        <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
-          <div className="p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div className="flex items-center gap-2 text-slate-300">
-              <Users className="h-5 w-5 text-red-500" />
-              <h3 className="font-semibold text-white">
-                {usuarioAtual === 'admin' ? 'Painel de Monitoramento de Migração (Geral)' : 'Meus Contatos Salvos'}
-              </h3>
-            </div>
-            
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                <input 
-                  type="text"
-                  value={termoPesquisa}
-                  onChange={e => setTermoPesquisa(e.target.value)}
-                  placeholder="Buscar por nome, telefone ou data..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-red-500 placeholder-slate-500"
-                />
-              </div>
-              <span className="text-xs bg-slate-800 text-slate-400 px-2.5 py-1.5 rounded shrink-0 font-medium">
-                {clientesFiltrados.length} listados
-              </span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            {carregando ? (
-              <div className="p-8 text-center text-slate-400">Carregando contatos...</div>
-            ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-900/50 text-slate-400 text-xs font-semibold uppercase border-b border-slate-800">
-                    <th className="p-4">Nome</th>
-                    <th className="p-4">Data do Contato</th>
-                    <th className="p-4">Número</th>
-                    <th className="p-4">Serviço</th>
-                    <th className="p-4">Valor</th>
-                    <th className="p-4">Quem Entrou em Contato</th>
-                    <th className="p-4">Obs</th>
-                    <th className="p-4">Andamento</th>
-                    <th className="p-4 text-right">Ações de Evolução</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-sm">
-                  {clientesFiltrados.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="p-8 text-center text-slate-500">
-                        {termoPesquisa ? 'Nenhum resultado encontrado para esta busca.' : 'Nenhum cliente cadastrado neste filtro.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    clientesFiltrados.map((cliente) => {
-                      return (
-                        <tr key={cliente.id} className="hover:bg-slate-900/30 transition">
-                          <td className="p-4 font-medium text-white">{cliente.nome}</td>
-                          <td className="p-4 text-slate-400">{cliente.data_contato}</td>
-                          <td className="p-4 text-slate-400">{cliente.numero}</td>
-                          <td className="p-4">
-                            <span className="text-xs bg-slate-900 px-2 py-1 rounded border border-slate-800 text-slate-300 font-medium">
-                              {cliente.servico || 'Consultoria'}
-                            </span>
-                          </td>
-                          <td className="p-4 text-amber-500 font-medium">
-                            R$ {(cliente.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="p-4">
-                            <span className="bg-slate-800 text-slate-300 text-xs px-2.5 py-1 rounded-full font-medium">
-                              {cliente.vendedora}
-                            </span>
-                          </td>
-                          
-                          {/* Coluna de OBS interativa e editável diretamente inline */}
-                          <td className="p-4 text-slate-400 max-w-xs">
-                            {clienteEditandoObs === cliente.id ? (
-                              <div className="flex items-center gap-1.5">
-                                <input 
-                                  type="text" 
-                                  value={textoObsEditando} 
-                                  onChange={e => setTextoObsEditando(e.target.value)}
-                                  className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none w-full"
-                                />
-                                <button onClick={() => salvarEdicaoObs(cliente.id)} className="text-emerald-500 hover:bg-emerald-500/10 p-1 rounded transition"><Check className="h-3.5 w-3.5" /></button>
-                                <button onClick={() => setClienteEditandoObs(null)} className="text-rose-500 hover:bg-rose-500/10 p-1 rounded transition"><X className="h-3.5 w-3.5" /></button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-between gap-1 group">
-                                <div className="flex items-center gap-1 truncate" title={cliente.obs}>
-                                  <FileText className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                                  <span>{cliente.obs || 'Nenhuma nota'}</span>
-                                </div>
-                                <button 
-                                  onClick={() => {
-                                    setClienteEditandoObs(cliente.id);
-                                    setTextoObsEditando(cliente.obs || '');
-                                  }} 
-                                  className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-amber-500 p-1 transition shrink-0"
-                                  title="Editar Observação"
-                                >
-                                  <Edit2 className="h-3 w-3" />
-                                </button>
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Dropdown interno que permite avançar ou voltar qualquer etapa de forma livre */}
-                          <td className="p-4">
-                            <select
-                              value={cliente.andamento}
-                              onChange={(e) => mudarAndamento(cliente.id, e.target.value)}
-                              className="text-xs font-semibold px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white focus:outline-none cursor-pointer"
-                            >
-                              {ETAPAS_FUNIL.map((etapa) => (
-                                <option key={etapa} value={etapa}>{etapa}</option>
-                              ))}
-                            </select>
-                          </td>
-
-                          <td className="p-4 text-right">
-                            {cliente.andamento === 'Migração Completa' ? (
-                              <span className="text-xs text-red-500 font-semibold bg-red-500/10 border border-red-500/20 px-2 py-1 rounded">
-                                🇪🇸 Migração Completa!
-                              </span>
-                            ) : (
-                              <button 
-                                onClick={() => {
-                                  const indexAtual = ETAPAS_FUNIL.indexOf(cliente.andamento);
-                                  if (indexAtual !== -1 && indexAtual < ETAPAS_FUNIL.length - 1) {
-                                    mudarAndamento(cliente.id, ETAPAS_FUNIL[indexAtual + 1]);
-                                  }
-                                }}
-                                className="text-xs bg-slate-800 text-amber-500 hover:bg-red-600/10 hover:text-red-400 px-3 py-1.5 rounded border border-slate-700 hover:border-red-500/30 transition font-medium flex items-center gap-1 ml-auto"
-                              >
-                                Próxima Etapa <ArrowRight className="h-3 w-3" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
 
       </main>
     </div>
